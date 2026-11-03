@@ -882,24 +882,19 @@ fail:
 
 bool CsvQueryTimeZone(ZoneDetect *library, const char* zone_name, char* result, size_t result_size) {
 #if defined(ESP_PLATFORM)
-  // Example: parse CSV without copying
-  const char *csv_ptr = (const char*)library->mapping_csv_data;
-  size_t line_cnt = 1;
+  // Rows are "zone","rule"; the CSV ends at the first byte that does not start a row (erased flash).
+  const char *csv_ptr = library->mapping_csv_data;
+  const char *csv_end = csv_ptr + library->partition_csv->size;
   size_t zone_len = strlen(zone_name);
-  while (*csv_ptr && csv_ptr < (const char*)library->mapping_csv_data + library->partition_csv->size) {
-      // parse line by line
-      const char *line_end = strchr(csv_ptr, '\n');
+  while (csv_ptr < csv_end && *csv_ptr == '"') {
+      const char *line_end = memchr(csv_ptr, '\n', csv_end - csv_ptr);
       if (!line_end) break;
-      // ESP_LOGI(TAG, "Line: %d %s %.*s", line_cnt, zone_name, (int)(line_end - csv_ptr), csv_ptr);
-
-      if (strncmp(zone_name, csv_ptr + 1, zone_len) == 0) {
-        const char *result_start = strchr(csv_ptr, ',') + 2;
+      if (strncmp(zone_name, csv_ptr + 1, zone_len) == 0 && csv_ptr[zone_len + 1] == '"') {
+        const char *result_start = csv_ptr + zone_len + 4;
         snprintf(result, result_size, "%.*s", (int)(line_end - result_start - 1), result_start);
         return true;
       }
-
       csv_ptr = line_end + 1;
-      if (++line_cnt > LINES_IN_CSV_FILE) break;
   }
   return false;
 #else
