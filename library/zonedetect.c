@@ -39,7 +39,7 @@
 #include <sys/mman.h>
 #include <fcntl.h>
 #include <unistd.h>
-#elif defined(CONFIG_IDF_TARGET_ESP32S3)
+#elif defined(ESP_PLATFORM)
 #include <errno.h>
 #include <sys/stat.h>
 #include "esp_partition.h"
@@ -78,14 +78,14 @@ struct ZoneDetectOpaque {
 #elif defined(__APPLE__) || defined(__linux__) || defined(__unix__) || defined(_POSIX_VERSION)
     int fd;
     off_t length;
-#elif defined(CONFIG_IDF_TARGET_ESP32S3)
+#elif defined(ESP_PLATFORM)
     uint32_t length;
-    esp_partition_t *partition;
+    const esp_partition_t *partition;
     esp_partition_mmap_handle_t map_handle;
 
-    esp_partition_t *partition_csv;
+    const esp_partition_t *partition_csv;
     esp_partition_mmap_handle_t map_handle_csv;
-    char* mapping_csv_data;
+    const char* mapping_csv_data;
 #else
     int length;
 #endif
@@ -831,7 +831,7 @@ void ZDCloseDatabase(ZoneDetect *library)
 #elif defined(__APPLE__) || defined(__linux__) || defined(__unix__) || defined(_POSIX_VERSION)
             if(library->mapping && munmap(library->mapping, (size_t)(library->length))) zdError(ZD_E_DB_MUNMAP, 0);
             if(library->fd >= 0 && close(library->fd))                                  zdError(ZD_E_DB_CLOSE, 0);
-#elif defined(CONFIG_IDF_TARGET_ESP32S3)
+#elif defined(ESP_PLATFORM)
             // if(library->mapping && munmap(library->mapping, (size_t)(library->length))) zdError(ZD_E_DB_MUNMAP, 0);
             // if(library->fd >= 0 && fclose(library->fd) != EOF)                          zdError(ZD_E_DB_CLOSE, 0);
             // Unmap mapped memory
@@ -880,7 +880,7 @@ fail:
 }
 
 bool CsvQueryTimeZone(ZoneDetect *library, const char* zone_name, char* result, size_t result_size) {
-#if defined(CONFIG_IDF_TARGET_ESP32S3)
+#if defined(ESP_PLATFORM)
   // Example: parse CSV without copying
   const char *csv_ptr = (const char*)library->mapping_csv_data;
   size_t line_cnt = 1;
@@ -908,7 +908,7 @@ bool CsvQueryTimeZone(ZoneDetect *library, const char* zone_name, char* result, 
 
 
 bool ZDOpenDatabaseMap(ZoneDetect *library, const char *path) {
-#if defined(CONFIG_IDF_TARGET_ESP32S3)
+#if defined(ESP_PLATFORM)
   // Find the partition map in the partition table
   library->partition_csv = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_ANY, path);
   if (library->partition_csv == NULL) {
@@ -978,7 +978,7 @@ ZoneDetect *ZDOpenDatabase(const char *path)
             zdError(ZD_E_DB_MMAP, errno);
             goto fail;
         }
-#elif defined(CONFIG_IDF_TARGET_ESP32S3)
+#elif defined(ESP_PLATFORM)
         // we are in esp32 system
         // Find the partition map in the partition table
         library->partition = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_ANY, path);
@@ -992,7 +992,7 @@ ZoneDetect *ZDOpenDatabase(const char *path)
         // Map the partition to data memory
         ESP_ERROR_CHECK(esp_partition_mmap(library->partition, 0, library->length, ESP_PARTITION_MMAP_DATA, &map_ptr, &library->map_handle));
         ESP_LOGI(TAG, "Mapped %lu partition to data memory address %p", library->length, map_ptr);
-        library->mapping = map_ptr;
+        library->mapping = (uint8_t *)map_ptr;
 #else
         zdError(ZD_E_DB_FS, errno);
         goto fail;
